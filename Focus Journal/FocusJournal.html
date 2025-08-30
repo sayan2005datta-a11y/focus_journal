@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Life Journal — Interactive UI</title>
+<style>
+  :root {
+    --bg: #f6f8fb; --card: #fff; --accent: #3b82f6; --muted: #6b7280;
+    --shadow: 0 10px 25px rgba(0,0,0,.06); --transition: 0.3s ease;
+  }
+  [data-theme="dark"] {
+    --bg: #000; --card: #111; --accent: #8b5cf6; --muted: #ccc; --shadow: 0 10px 25px rgba(0,0,0,.45);
+  }
+  * { box-sizing:border-box; transition: all var(--transition); }
+  body {
+    margin:0; 
+    font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    background:var(--bg); 
+    color:#0f172a; 
+    transition: background var(--transition), color var(--transition);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  [data-theme="dark"] body { color:#fff; }
+  .container { max-width:980px; margin:28px auto; padding:18px; }
+  header { display:flex;align-items:center;justify-content:space-between;margin-bottom:12px; }
+  .brand { font-weight:700;color:var(--accent); font-size:20px; }
+  .tabs { display:flex;gap:8px; position:relative; }
+  .tab { padding:8px 12px;border-radius:10px;background:#fff;border:1px solid rgba(0,0,0,.06);cursor:pointer; position:relative; overflow:hidden; }
+  .tab.active { background:var(--accent); color:white;border-color:transparent; }
+  .tab::after { content:""; position:absolute; left:0; bottom:0; height:3px; width:0; background:var(--accent); transition:width var(--transition); }
+  .tab.active::after { width:100%; }
+  .card { background:var(--card); padding:14px; border-radius:12px; box-shadow:var(--shadow); margin-bottom:14px; opacity:0; transform:translateY(10px); animation:fadeIn 0.4s forwards; color:inherit; }
+  @keyframes fadeIn { to { opacity:1; transform:translateY(0); } }
+  .cal-head { display:flex;justify-content:space-between;align-items:center;margin-bottom:10px; flex-wrap:wrap; }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+  .dow { font-size:12px; color:var(--muted); text-align:center; }
+  .day { background:#fff; padding:10px; border-radius:10px; text-align:left; cursor:pointer; border:1px solid rgba(0,0,0,.06); min-height:72px; position:relative; transition: all 0.2s ease; color:inherit; }
+  .day.muted { opacity:.45; }
+  .day.today { box-shadow:0 6px 18px rgba(59,130,246,.16); border:2px solid rgba(59,130,246,.18); animation:pulse 2s infinite; }
+  @keyframes pulse { 0% { box-shadow:0 0 0 rgba(59,130,246,0.2); } 50% { box-shadow:0 0 10px rgba(59,130,246,0.4); } 100% { box-shadow:0 0 0 rgba(59,130,246,0.2); } }
+  .day:hover { transform:scale(1.05); box-shadow:0 12px 25px rgba(0,0,0,.15); }
+  .num { font-weight:700; margin-bottom:6px; }
+  .markers { position:absolute; left:8px; bottom:8px; display:flex; gap:6px; opacity:0; transition:opacity 0.3s; }
+  .day:hover .markers { opacity:1; }
+  .dot { width:10px; height:10px; border-radius:999px; }
+  .dot.entry { background:var(--accent); }
+  .dot.task { background:#10b981; }
+  .btn { padding:8px 10px; border-radius:10px; border:1px solid rgba(0,0,0,.06); cursor:pointer; background:#fff; transition: all 0.2s ease; position:relative; overflow:hidden; color:inherit; }
+  .btn.primary { background:var(--accent); color:#fff; border:none; }
+  .btn:hover { transform:scale(1.05); box-shadow:0 6px 15px rgba(0,0,0,.1); }
+  input,textarea,select { width:100%; padding:8px; border-radius:8px; border:1px solid rgba(0,0,0,.08); margin-bottom:8px; background:var(--card); color:inherit; transition: background var(--transition), color var(--transition); }
+  .flex { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .journal-list,.tasks-list { max-height:300px; overflow:auto; }
+  .mood-btn { cursor:pointer; padding:6px; border-radius:8px; transition: transform 0.2s ease, outline 0.2s ease; font-size:18px; }
+  .mood-selected { outline:3px solid rgba(59,130,246,.2); transform:scale(1.2); }
+  .small { font-size:13px;color:var(--muted); }
+
+  /* DARK MODE OVERRIDES */
+  [data-theme="dark"] body { background:#000; color:#fff; }
+  [data-theme="dark"] .card { background:#111; color:#fff; border-color:#444; }
+  [data-theme="dark"] .day { background:#111; border-color:#444; color:#fff; }
+  [data-theme="dark"] input, [data-theme="dark"] textarea, [data-theme="dark"] select { background:#111; color:#fff; border-color:#555; }
+  [data-theme="dark"] .btn { background:#222; color:#fff; border-color:#555; }
+  [data-theme="dark"] .btn.primary { background:#8b5cf6; color:#fff; border:none; }
+  [data-theme="dark"] .dot.entry { background:#8b5cf6; }
+  [data-theme="dark"] .dot.task { background:#10b981; }
+  [data-theme="dark"] .dow, [data-theme="dark"] .small { color:#ccc; }
+  [data-theme="dark"] .journal-list .card div:last-child { color:#f0f0f0 !important; }
+  [data-theme="dark"] #page-plans input,
+  [data-theme="dark"] #page-plans textarea { background: #222; color: #fff; border-color: #555; }
+  [data-theme="dark"] #page-plans .tasks-list > div { background: #111 !important; color: #fff !important; border-color: #444 !important; }
+  [data-theme="dark"] #page-plans .tasks-list > div .small { color: #ccc !important; }
+
+  /* Login/Signup page */
+  #loginPage { max-width:380px; margin:50px auto; padding:20px; border-radius:12px; box-shadow:var(--shadow); background:var(--card); }
+</style>
+</head>
+<body data-theme="light">
+<div id="loginPage" style="display:none">
+  <h2 id="loginTitle">Login</h2>
+  <input type="text" id="username" placeholder="Username">
+  <input type="password" id="password" placeholder="Password">
+  <div class="flex">
+    <button id="loginBtn" class="btn primary">Login</button>
+    <button id="toggleLoginSignup" class="btn">Don't have an account? Sign up</button>
+  </div>
+</div>
+
+<div id="mainApp" style="display:none" class="container">
+  <header>
+    <div class="brand">✨ Focus Journal</div>
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-target="calendar">Calendar</button>
+      <button class="tab" data-target="journal">Journal</button>
+      <button class="tab" data-target="plans">Plans</button>
+      <button class="tab" data-target="settings">Settings</button>
+    </div>
+    <button id="logoutBtn" class="btn" style="margin-left:10px">Logout</button>
+  </header>
+
+  <!-- Calendar -->
+  <section id="page-calendar" class="page card">
+    <div class="cal-head">
+      <div class="flex">
+        <button id="prevMonth" class="btn">◀</button>
+        <button id="todayBtn" class="btn">Today</button>
+        <button id="nextMonth" class="btn">▶</button>
+      </div>
+      <h3 id="monthLabel" style="margin:0"></h3>
+      <div id="quote" class="small">Small steps every day.</div>
+    </div>
+    <div class="cal-grid" id="calDOW"></div>
+    <div class="cal-grid" id="calendarGrid" style="margin-top:8px"></div>
+  </section>
+
+  <!-- Journal -->
+  <section id="page-journal" class="page" style="display:none">
+    <div class="card">
+      <h3>Journal</h3>
+      <div class="flex">
+        <input type="date" id="entryDate">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="saveEntry" class="btn primary">Save</button>
+          <button id="deleteAllEntriesBtn" class="btn">Delete All</button>
+        </div>
+      </div>
+      <label class="small">Mood</label>
+      <div class="flex" style="margin-bottom:8px">
+        <span class="mood-btn" data-mood="😀">😀</span>
+        <span class="mood-btn" data-mood="😐">😐</span>
+        <span class="mood-btn" data-mood="😢">😢</span>
+      </div>
+      <textarea id="entryText" rows="6" placeholder="Write about this date..."></textarea>
+      <h4 style="margin-top:12px">Saved entries</h4>
+      <div id="journalList" class="journal-list"></div>
+    </div>
+  </section>
+
+  <!-- Plans -->
+  <section id="page-plans" class="page" style="display:none">
+    <div class="card">
+      <h3>Plans / Tasks</h3>
+      <input id="taskTitle" placeholder="Title">
+      <input id="taskDateTime" type="datetime-local">
+      <textarea id="taskDesc" rows="3" placeholder="Description"></textarea>
+      <div class="flex">
+        <button id="addTaskBtn" class="btn primary">Add Task</button>
+      </div>
+      <h4 style="margin-top:12px">Tasks</h4>
+      <div id="tasksList" class="tasks-list"></div>
+    </div>
+  </section>
+
+  <!-- Settings -->
+  <section id="page-settings" class="page" style="display:none">
+    <div class="card">
+      <h3>Settings</h3>
+      <label><input id="toggleTheme" type="checkbox"> Dark mode</label>
+      <div style="margin-top:10px" class="flex">
+        <button id="clearData" class="btn">Clear All</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// Utilities
+const $ = (s, ctx=document) => ctx.querySelector(s);
+const $$ = (s, ctx=document) => Array.from(ctx.querySelectorAll(s));
+function pad(n){ return n<10?'0'+n:''+n; }
+function formatLocalDate(dt){ return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`; }
+function dateFromYmd(ymd){ const [y,m,d]=ymd.split('-').map(Number); return new Date(y,m-1,d); }
+function journalKey(user, dateYmd){ return `${user}-journal-${dateYmd}`; }
+function taskKey(user, dateTime){ return `${user}-task-${dateTime}`; }
+function themeKey(user){ return `${user}-theme`; }
+
+// State
+let viewYear, viewMonth, selectedDate=null, selectedMood='😀', currentUser=null;
+const dow=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const QUOTES=['Small steps every day.','Mood follows action.','Write it to make it real.','What gets scheduled gets done.'];
+
+// ------------------ Login/Signup ------------------
+let isLogin = true;
+
+function loadUserData(user){
+  const t = localStorage.getItem(themeKey(user));
+  document.body.dataset.theme = t||'light';
+}
+
+function signupUser(u,p){
+  if(localStorage.getItem('user-'+u)) return false; 
+  localStorage.setItem('user-'+u, p);
+  return true;
+}
+
+function loginUser(u,p){
+  const stored = localStorage.getItem('user-'+u);
+  return stored && stored === p;
+}
+
+function loginOrSignupSuccess(u){
+  currentUser = u;
+  localStorage.setItem('currentUser', currentUser);
+  loadUserData(currentUser);
+  $('#loginPage').style.display='none';
+  $('#mainApp').style.display='';
+  initApp();
+}
+
+$('#toggleLoginSignup').addEventListener('click', ()=>{
+  isLogin = !isLogin;
+  $('#loginTitle').textContent = isLogin ? 'Login' : 'Sign Up';
+  $('#loginBtn').textContent = isLogin ? 'Login' : 'Sign Up';
+  $('#toggleLoginSignup').textContent = isLogin ? "Don't have an account? Sign up" : "Already have an account? Login";
+  $('#username').value = '';
+  $('#password').value = '';
+});
+
+$('#loginBtn').addEventListener('click', ()=>{
+  const u = $('#username').value.trim();
+  const p = $('#password').value;
+  if(!u || !p){ alert('Enter username/password'); return; }
+  const success = isLogin ? loginUser(u,p) : signupUser(u,p);
+  if(!success){
+    alert(isLogin ? 'Invalid credentials' : 'Username already exists');
+    return;
+  }
+  loginOrSignupSuccess(u);
+});
+
+$('#logoutBtn').addEventListener('click', ()=>{
+  currentUser = null;
+  localStorage.removeItem('currentUser');
+  $('#mainApp').style.display = 'none';
+  $('#loginPage').style.display = '';
+  isLogin = true;
+  $('#loginTitle').textContent = 'Login';
+  $('#loginBtn').textContent = 'Login';
+  $('#toggleLoginSignup').textContent = "Don't have an account? Sign up";
+  $('#username').value = '';
+  $('#password').value = '';
+});
+
+// ------------------ Calendar ------------------
+function renderDOW(){ $('#calDOW').innerHTML = dow.map(d=>`<div class="dow">${d}</div>`).join(''); }
+function renderCalendar(){
+  const first=new Date(viewYear,viewMonth,1), start=new Date(first); start.setDate(first.getDate()-first.getDay());
+  const today=formatLocalDate(new Date());
+  let html='';
+  for(let i=0;i<42;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const ymd=formatLocalDate(d), muted=d.getMonth()!==viewMonth?'muted':'', isToday=ymd===today?'today':'';
+    const hasEntry=!!localStorage.getItem(journalKey(currentUser, ymd));
+    const hasTask=Object.keys(localStorage).some(k=>k.startsWith(`${currentUser}-task-`) && k.includes(ymd));
+    html+=`<div class="day ${muted} ${isToday}" data-date="${ymd}">
+      <div class="num">${d.getDate()}</div>
+      <div class="markers">
+        ${hasEntry?'<span class="dot entry" title="Journal"></span>':''}
+        ${hasTask?'<span class="dot task" title="Task"></span>':''}
+      </div>
+    </div>`;
+  }
+  $('#calendarGrid').innerHTML=html;
+  $('#monthLabel').textContent=new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric'}).format(new Date(viewYear,viewMonth,1));
+  $('#quote').textContent=QUOTES[viewMonth % QUOTES.length];
+  $$('.day').forEach(el=>el.addEventListener('click',()=>{ const ymd=el.dataset.date; selectedDate=ymd; $('#entryDate').value=ymd; loadEntryIntoEditor(ymd); switchTab('journal'); }));
+}
+
+// ------------------ Journal ------------------
+function setMood(m){ selectedMood=m; $$('.mood-btn').forEach(b=>b.classList.toggle('mood-selected',b.dataset.mood===m)); }
+function loadEntryIntoEditor(ymd){
+  if(!ymd) return;
+  selectedDate=ymd;
+  const raw=localStorage.getItem(journalKey(currentUser, ymd));
+  if(raw){ try{ const obj=JSON.parse(raw); $('#entryText').value=obj.text||''; setMood(obj.mood||'😀'); }catch(e){ $('#entryText').value=raw||''; setMood('😀'); } }
+  else { $('#entryText').value=''; setMood('😀'); }
+}
+function saveEntryFromEditor(){
+  const date=$('#entryDate').value||selectedDate; if(!date){ alert('Pick a date first'); return; }
+  const text=$('#entryText').value; const payload={text,mood:selectedMood,savedAt:new Date().toISOString()};
+  localStorage.setItem(journalKey(currentUser, date),JSON.stringify(payload));
+  selectedDate=date; $('#entryDate').value=date; renderCalendar(); loadJournalList();
+}
+function deleteAllEntries(){ if(!confirm('Delete ALL journal entries?')) return; Object.keys(localStorage).filter(k=>k.startsWith(currentUser+'-journal-')).forEach(k=>localStorage.removeItem(k)); loadJournalList(); renderCalendar(); loadEntryIntoEditor(selectedDate); }
+function loadJournalList(){
+  const list=$('#journalList'); list.innerHTML='';
+  const keys=Object.keys(localStorage).filter(k=>k.startsWith(currentUser+'-journal-')).sort().reverse();
+  for(const k of keys){
+    try{
+      const obj=JSON.parse(localStorage.getItem(k)); const ymd=k.split('-').slice(2).join('-'); const t=obj.text||'';
+      list.insertAdjacentHTML('beforeend',
+      `<div class="card" style="margin-bottom:8px;padding:8px;border-radius:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>${ymd}</strong> <span class="small">${obj.mood||''}</span></div>
+          <div><button class="btn" onclick="deleteEntry('${ymd}')">Delete</button></div>
+        </div>
+        <div style="margin-top:8px">${(t.length>200)?t.slice(0,200)+'...':(t||'<em>(empty)</em>')}</div>
+      </div>`);
+    }catch(e){}
+  }
+}
+window.deleteEntry=function(ymd){ if(!confirm('Delete entry for '+ymd+'?')) return; localStorage.removeItem(journalKey(currentUser, ymd)); renderCalendar(); loadJournalList(); }
+
+// ------------------ Tasks ------------------
+function addTask(){ const title=$('#taskTitle').value.trim(), dt=$('#taskDateTime').value, desc=$('#taskDesc').value.trim(); if(!title||!dt){ alert('Title and date/time required'); return; } const key=taskKey(currentUser, dt+'-'+Math.random().toString(36).slice(2,8)); localStorage.setItem(key,JSON.stringify({title,dateTime:dt,desc})); $('#taskTitle').value=''; $('#taskDateTime').value=''; $('#taskDesc').value=''; renderCalendar(); loadTasks(); }
+function loadTasks(){ const list=$('#tasksList'); list.innerHTML=''; const keys=Object.keys(localStorage).filter(k=>k.startsWith(currentUser+'-task-')).sort(); for(const k of keys){ try{ const t=JSON.parse(localStorage.getItem(k)); list.insertAdjacentHTML('beforeend',`<div style="padding:8px;border-radius:8px;background:#fff;margin-bottom:8px">
+  <div style="display:flex;justify-content:space-between"><div><strong>${t.title}</strong><div class="small">${t.dateTime}</div></div><div><button class="btn" onclick="deleteTask('${k}')">Delete</button></div></div>
+  <div style="margin-top:8px">${t.desc||''}</div></div>`);}catch(e){} } }
+window.deleteTask=function(k){ if(confirm('Delete task?')){ localStorage.removeItem(k); renderCalendar(); loadTasks(); } }
+
+// ------------------ Tabs + Init ------------------
+function switchTab(target){ $$('.page').forEach(p=>p.style.display='none'); $('#page-'+target).style.display=''; $$('.tab').forEach(t=>t.classList.toggle('active',t.dataset.target===target)); }
+function setToToday(){ const t=new Date(); viewYear=t.getFullYear(); viewMonth=t.getMonth(); selectedDate=formatLocalDate(t); $('#entryDate').value=selectedDate; }
+
+function initApp(){
+  setToToday(); renderDOW(); renderCalendar(); loadJournalList(); loadTasks(); loadEntryIntoEditor(selectedDate);
+
+  $('#prevMonth').addEventListener('click',()=>{ viewMonth--; if(viewMonth<0){ viewMonth=11; viewYear--; } renderCalendar(); });
+  $('#nextMonth').addEventListener('click',()=>{ viewMonth++; if(viewMonth>11){ viewMonth=0; viewYear++; } renderCalendar(); });
+  $('#todayBtn').addEventListener('click',()=>{ setToToday(); renderCalendar(); });
+
+  $$('#tabs .tab').forEach(tab=>tab.addEventListener('click',()=>switchTab(tab.dataset.target)));
+
+  $$('.mood-btn').forEach(b=>b.addEventListener('click',()=>setMood(b.dataset.mood)));
+  setMood(selectedMood);
+
+  $('#entryDate').addEventListener('change', e=>{ const d=e.target.value; if(!d) return; selectedDate=d; loadEntryIntoEditor(d); });
+
+  $('#saveEntry').addEventListener('click', saveEntryFromEditor);
+  $('#deleteAllEntriesBtn').addEventListener('click', deleteAllEntries);
+
+  $('#addTaskBtn').addEventListener('click', addTask);
+
+  // dark mode
+  $('#toggleTheme').addEventListener('change', (e)=>{
+    document.body.dataset.theme=e.target.checked?'dark':'light';
+    localStorage.setItem(themeKey(currentUser), document.body.dataset.theme);
+  });
+  // clear all data
+  $('#clearData').addEventListener('click',()=>{ if(!confirm('Clear ALL stored data for this account?')) return; Object.keys(localStorage).filter(k=>k.startsWith(currentUser+'-')).forEach(k=>localStorage.removeItem(k)); setToToday(); renderCalendar(); loadJournalList(); loadTasks(); loadEntryIntoEditor(selectedDate); });
+
+  window.addEventListener('storage',()=>{ renderCalendar(); loadJournalList(); loadTasks(); });
+}
+
+// ------------------ On Load ------------------
+window.addEventListener('DOMContentLoaded', ()=>{
+  const lastUser = localStorage.getItem('currentUser');
+  if(lastUser){ currentUser = lastUser; loadUserData(currentUser); $('#loginPage').style.display='none'; $('#mainApp').style.display=''; initApp(); }
+  else { $('#loginPage').style.display=''; $('#mainApp').style.display='none'; }
+});
+</script>
+</body>
+</html>
